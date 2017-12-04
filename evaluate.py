@@ -75,8 +75,8 @@ def argsp():
 
 if __name__=='__main__':
     
-    pars={'dataset_path' : '/misc/kcgscratch1/ChoGroup/thien/projects/wsd/dataPreparer/event/data/Semcor',
-          'embedding_path' : '/misc/kcgscratch1/ChoGroup/thien/projects/wsd/dataPreparer/event/word2vec.pkl.fetFreq2.SemcorACE.NoShuffled.pkl',
+    pars={'dataset_path' : '/scratch/wl1191/wsd2ed/data/Semcor',
+          'embedding_path' : '/scratch/wl1191/wsd2ed/data/Semcor_processed/word2vec.pkl.fetFreq2.SemcorACE.NoShuffled.pkl',
           'model' : 'convolute', # convolute # rnnHead, rnnMax, rnnHeadFf, rnnMaxFf, rnnHeadForward, rnnHeadBackward, rnnMaxForward, rnnMaxBackward, rnnHeadFfForward, rnnHeadFfBackward, rnnMaxFfForward, rnnMaxFfBackward # alternateHead, alternateMax, alternateConv, nonConsecutiveConvolute, rnnHeadNonConsecutiveConv
           'wedWindow' : 2,
           'expected_features' : OrderedDict([('anchor', 0),

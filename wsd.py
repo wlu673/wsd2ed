@@ -18,16 +18,16 @@ from data_iterator import *
 
 ##################################################################
 
-scoreScript = {'wsd' : '/misc/kcgscratch1/ChoGroup/thien/projects/wsd/dataPreparer/sharingWeaver/scorer/scorer2',
-               'event' : '/misc/kcgscratch1/ChoGroup/thien/projects/wsd/dataPreparer/event/data/eventScorer.py', }
+scoreScript = {'wsd' : '/scratch/wl1191/wsd2ed/scorers/scorer2',
+               'event' : '/scratch/wl1191/wsd2ed/scorers/eventScorer.py', }
                
 paths_to_keys = {#'valid' : '/misc/kcgscratch1/ChoGroup/thien/projects/wsd/dataPreparer/sharingWeaver/datasetOneMil11-sampled/valid.key', #'/misc/kcgscratch1/ChoGroup/thien/projects/wsd/dataPreparer/sharingWeaver/dataset/valid.key',
-                 'valid' : '/misc/kcgscratch1/ChoGroup/thien/projects/wsd/dataPreparer/event/data/Semcor/valid.key',
-                 'sense02' : '/misc/kcgscratch1/ChoGroup/thien/projects/wsd/dataPreparer/sharingWeaver/dataset/sense02.key',
-                 'sense03' : '/misc/kcgscratch1/ChoGroup/thien/projects/wsd/dataPreparer/sharingWeaver/dataset/sense03.key',
-                 'sense07' : '/misc/kcgscratch1/ChoGroup/thien/projects/wsd/dataPreparer/sharingWeaver/dataset/sense07.key',
-                 'eventValid' : '/misc/kcgscratch1/ChoGroup/thien/projects/wsd/dataPreparer/event/data/OneMil/eventValid.key',
-                 'eventTest' : '/misc/kcgscratch1/ChoGroup/thien/projects/wsd/dataPreparer/event/data/OneMil/eventTest.key', }
+                 'valid' : '/scratch/wl1191/wsd2ed/data/Semcor/valid.key',
+                 'sense02' : '/scratch/wl1191/wsd2ed/data/Semcor/sense02.key',
+                 'sense03' : '/scratch/wl1191/wsd2ed/data/Semcor/sense03.key',
+                 'sense07' : '/scratch/wl1191/wsd2ed/data/Semcor/sense07.key',
+                 'eventValid' : '/scratch/wl1191/wsd2ed/data/Semcor/eventValid.key',
+                 'eventTest' : '/scratch/wl1191/wsd2ed/data/Semcor/eventTest.key', }
 
 def prepareData(rev, embeddings, dictionaries, features, anchorMat, useBinaryFeatures):
 
@@ -164,7 +164,7 @@ def train(dataset_path='',
         kGivens = cPickle.load(open(givenPath, 'rb'))
     else: print givenPath, ' not exist'
     
-    folder = '/misc/kcgscratch1/ChoGroup/thien/projects/wsd/dataPreparer/event/res/' + folder
+    folder = '/scratch/wl1191/wsd2ed/out/' + folder
 
     paramFolder = folder + '/params'
 
