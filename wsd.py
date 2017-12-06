@@ -18,16 +18,16 @@ from data_iterator import *
 
 ##################################################################
 
-scoreScript = {'wsd' : '/scratch/wl1191/wsd2ed/scorers/scorer2',
-               'event' : '/scratch/wl1191/wsd2ed/scorers/eventScorer.py', }
+scoreScript = {'wsd' : '/scratch/wl1191/wsd2ed2/scorers/scorer2',
+               'event' : '/scratch/wl1191/wsd2ed2/scorers/eventScorer.py', }
                
 paths_to_keys = {#'valid' : '/misc/kcgscratch1/ChoGroup/thien/projects/wsd/dataPreparer/sharingWeaver/datasetOneMil11-sampled/valid.key', #'/misc/kcgscratch1/ChoGroup/thien/projects/wsd/dataPreparer/sharingWeaver/dataset/valid.key',
-                 'valid' : '/scratch/wl1191/wsd2ed/data/Semcor/valid.key',
-                 'sense02' : '/scratch/wl1191/wsd2ed/data/Semcor/sense02.key',
-                 'sense03' : '/scratch/wl1191/wsd2ed/data/Semcor/sense03.key',
-                 'sense07' : '/scratch/wl1191/wsd2ed/data/Semcor/sense07.key',
-                 'eventValid' : '/scratch/wl1191/wsd2ed/data/Semcor/eventValid.key',
-                 'eventTest' : '/scratch/wl1191/wsd2ed/data/Semcor/eventTest.key', }
+                 'senseValid' : '/scratch/wl1191/wsd2ed2/data/Semcor/senseValid.key',
+                 'sense02' : '/scratch/wl1191/wsd2ed2/data/Semcor/sense02.key',
+                 'sense03' : '/scratch/wl1191/wsd2ed2/data/Semcor/sense03.key',
+                 'sense07' : '/scratch/wl1191/wsd2ed2/data/Semcor/sense07.key',
+                 'eventValid' : '/scratch/wl1191/wsd2ed2/data/Semcor/eventValid.key',
+                 'eventTest' : '/scratch/wl1191/wsd2ed2/data/Semcor/eventTest.key', }
 
 def prepareData(rev, embeddings, dictionaries, features, anchorMat, useBinaryFeatures):
 
@@ -67,8 +67,11 @@ def predict(ncp, corpus, wsdModel, dictionaries, embeddings, features, anchorMat
         if not oneBatch['isValid']: break
         
         zippedCorpus, oneRev = prepareData(oneBatch, embeddings, dictionaries, features, anchorMat, useBinaryFeatures)
-        
-        disams = wsdModel.disambiguate(*zippedCorpus[0:-1])
+
+        if 'sense' in ncp:
+            disams = wsdModel.pred_wsd(*zippedCorpus[0:-1])
+        else:
+            disams = wsdModel.pred_event(*zippedCorpus[0:-1])
         
         if state <= 0: state = len(disams)
         
@@ -150,6 +153,7 @@ def train(dataset_path='',
           nhidden=100,
           conv_feature_map=100,
           conv_win_feature_map=[2,3,4,5],
+          lamb=0.01,
           seed=3435,
           nepochs=50,
           folder='./res',
@@ -164,7 +168,7 @@ def train(dataset_path='',
         kGivens = cPickle.load(open(givenPath, 'rb'))
     else: print givenPath, ' not exist'
     
-    folder = '/scratch/wl1191/wsd2ed/out/' + folder
+    folder = '/scratch/wl1191/wsd2ed2/out/' + folder
 
     paramFolder = folder + '/params'
 
@@ -203,14 +207,14 @@ def train(dataset_path='',
         elif features[ffin] == 0:
             features_dim[ffin] = embeddings[ffin].shape[1]
             
-    datasetNames = ['train', 'valid', 'sense02', 'sense03', 'sense07', 'eventValid', 'eventTest']
+    datasetNames = ['senseTrain', 'eventTrain', 'senseValid', 'sense02', 'sense03', 'sense07', 'eventValid', 'eventTest']
     datasets = {}
     for dn in datasetNames:
         datasets[dn] = TextIterator(dataset_path + '/' + dn + '.dat',
                                     dictionaries,
                                     batch_size=batch,
                                     maxLenContext=contextLength,
-                                    toPredict= False if dn == 'train' else True)   
+                                    toPredict= False if 'Train' in dn else True)
     
     del _params['dataset_path']
     del _params['embedding_path']
@@ -239,6 +243,7 @@ def train(dataset_path='',
               'multilayerNN2' : multilayerNN2,
               'conv_feature_map' : conv_feature_map,
               'conv_win_feature_map' : conv_win_feature_map,
+              'lamb' : lamb,
               '_params' : _params}
     
     # instanciate the model
@@ -252,15 +257,22 @@ def train(dataset_path='',
         useBinaryFeatures = True
         params['useBinaryFeatures'] = useBinaryFeatures
         wsdModel = eval('hybridModel')(params)
+    elif model.endswith('2'):
+        model = model[:-1]
+        params['model'] = model
+        useBinaryFeatures = False
+        params['useBinaryFeatures'] = useBinaryFeatures
+        wsdModel = eval('twoNetsModel')(params)
     else:
         useBinaryFeatures = False
         params['useBinaryFeatures'] = useBinaryFeatures
         wsdModel = eval('mainModel')(params)
     print 'done'
     
-    trainData = datasets['train']
+    trainDataSense = datasets['senseTrain']
+    trainDataEvent = datasets['eventTrain']
     evaluatingDataset = OrderedDict([
-                                     ('valid', datasets['valid']),
+                                     ('senseValid', datasets['senseValid']),
                                      ('sense02', datasets['sense02']),
                                      ('sense03', datasets['sense03']),
                                      ('sense07', datasets['sense07']),
@@ -280,8 +292,9 @@ def train(dataset_path='',
         s['_ce'] = e
         tic = time.time()
         print '-------------------training in epoch: ', e, ' -------------------------------------'
+        print '\nTraining on word sense disambiguation ...\n'
         miniId = -1
-        for oneBatch, _ in trainData:
+        for oneBatch, _ in trainDataSense:
             if not oneBatch['isValid'] : break
             
             if anchorMat.ndim == 1:
@@ -291,8 +304,8 @@ def train(dataset_path='',
             #if miniId >= 50: break
             zippedData, _ = prepareData(oneBatch, embeddings, dictionaries, features, anchorMat, useBinaryFeatures)
             
-            wsdModel.f_grad_shared(*zippedData)
-            wsdModel.f_update_param(clr)
+            wsdModel.f_grad_shared_sense(*zippedData)
+            wsdModel.f_update_param_sense(clr)
             
             for ed in wsdModel.container['embDict']:
                 wsdModel.container['setZero'][ed](wsdModel.container['zeroVecs'][ed])
@@ -300,6 +313,34 @@ def train(dataset_path='',
             if verbose:
                 if miniId % 50 == 0:
                     print 'epoch %i >> %2.2f'%(e,(miniId+1)),'completed in %.2f (sec) <<'%(time.time()-tic)
+                    sys.stdout.flush()
+
+        print '\nTraining on event detection ...\n'
+        miniId = -1
+        for oneBatch, _ in trainDataEvent:
+            if not oneBatch['isValid']: break
+
+            if anchorMat.ndim == 1:
+                anchorMat = numpy.zeros(oneBatch['word'].shape, dtype='int32') if features[
+                                                                                      'anchor'] == 0 else numpy.zeros(
+                    (oneBatch['word'].shape[0], oneBatch['word'].shape[1], embeddings['anchor'].shape[0] - 1),
+                    dtype='int32')
+
+            miniId += 1
+            # if miniId >= 50: break
+            zippedData, _ = prepareData(oneBatch, embeddings, dictionaries, features, anchorMat,
+                                        useBinaryFeatures)
+
+            wsdModel.f_grad_shared_event(*zippedData)
+            wsdModel.f_update_param_event(clr)
+
+            for ed in wsdModel.container['embDict']:
+                wsdModel.container['setZero'][ed](wsdModel.container['zeroVecs'][ed])
+
+            if verbose:
+                if miniId % 50 == 0:
+                    print 'epoch %i >> %2.2f' % (e, (miniId + 1)), 'completed in %.2f (sec) <<' % (
+                    time.time() - tic)
                     sys.stdout.flush()
 
         # evaluation // back into the real world : idx -> words
@@ -317,9 +358,9 @@ def train(dataset_path='',
         #for elu in evaluatingDataset:
         #    saving(evaluatingDataset[elu], _predictions[elu], _probs[elu], idx2word, idx2label, idMappings[elu], folder + '/' + elu + str(e) + '.out')
         
-        if _perfs['valid']['f1'] > best_f1:
+        if _perfs['eventValid']['f1'] > best_f1:
             #rnn.save(folder)
-            best_f1 = _perfs['valid']['f1']
+            best_f1 = _perfs['eventValid']['f1']
             print '*************NEW BEST: epoch: ', e
             if verbose:
                 perPrint(_perfs, len('Current Performance')*'-')

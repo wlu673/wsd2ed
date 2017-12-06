@@ -121,6 +121,26 @@ def getConcatenation(embDict, vars, features, features_dim, tranpose=False):
 
     return basex
 
+def getConcatenationSuffix(embDict, vars, features, features_dim, suffix, tranpose=False):
+    xs = []
+
+    for ed in features:
+        if features[ed] == 0:
+            var = vars[ed] if not tranpose else vars[ed].T
+            xs += [embDict[ed + '_' + suffix][T.cast(var.flatten(), dtype='int32')].reshape((var.shape[0], var.shape[1], features_dim[ed]))]
+        elif features[ed] == 1:
+            if not tranpose:
+                xs += [vars[ed]]
+            else:
+                xs += [vars[ed].dimshuffle(1,0,2)]
+
+    if len(xs) == 1:
+        basex = xs[0]
+    else:
+        basex = T.cast(T.concatenate(xs, axis=2), dtype=theano.config.floatX)
+
+    return basex
+
 def getInverseConcatenation(embDict, vars, features, features_dim):
         
     ixs = []
@@ -737,6 +757,27 @@ def localWordEmbeddingsTrigger(model):
     
     return rep, dim_rep
 
+def localWordEmbeddingsTriggerSuffix(model, suffix):
+    wedWindow = model.args['wedWindow']
+
+    extendedWords = model.container['vars']['word']
+    wleft = T.zeros((extendedWords.shape[0], wedWindow), dtype='int32')
+    wright = T.zeros((extendedWords.shape[0], wedWindow), dtype='int32')
+    extendedWords = T.cast(T.concatenate([wleft, extendedWords, wright], axis=1), dtype='int32')
+
+    def recurrence(words, pos, eembs):
+        fet = words[pos:(pos + 2 * wedWindow + 1)]
+        fet = eembs[fet].flatten()
+        return [fet]
+
+    rep, _ = theano.scan(fn=recurrence, sequences=[extendedWords, model.container['anchor']],
+                         n_steps=extendedWords.shape[0], non_sequences=[model.container['embDict']['word' + '_' + suffix]],
+                         outputs_info=[None])
+
+    dim_rep = (2 * wedWindow + 1) * model.args['embs']['word'].shape[1]
+
+    return rep, dim_rep
+
 class mainModel(BaseModel):
     def __init__(self, args):
 
@@ -820,6 +861,222 @@ class hybridModel(BaseModel):
         dim_inter = dim_model + dim_multi
             
         self.buildFunctions(fetre, fetre_dropout, dim_inter)
+
+class twoNetsModel():
+    def __init__(self, args):
+        '''
+                nh :: dimension of the hidden layer
+                nc :: number of classes
+                ne :: number of word embeddings in the vocabulary
+                #de :: dimension of the word embeddings
+                cs :: word window context size
+                '''
+        self.container = {}
+
+        self.args = args
+        self.args['rng'] = numpy.random.RandomState(3435)
+        self.args['dropout'] = args['dropout'] if args['dropout'] > 0. else 0.
+
+        # parameters of the model
+
+        self.container['params'], self.container['names'] = [], []
+
+        self.container['embDict'] = OrderedDict()
+        self.container['vars'] = OrderedDict()
+        self.container['dimIn'] = 0
+
+        print '******************FEATURES******************'
+        for ed in self.args['features']:
+            if self.args['features'][ed] == 0:
+                if ed != 'word':
+                    self.container['embDict'][ed + '_sense'] = theano.shared(
+                        createMatrix(self.args['embs'][ed].astype(theano.config.floatX), self.args['kGivens'],
+                                     ed + '_sense'))
+                    self.container['embDict'][ed + '_event'] = theano.shared(
+                        createMatrix(self.args['embs'][ed].astype(theano.config.floatX), self.args['kGivens'],
+                                     ed + '_event'))
+                else:
+                    self.container['embDict'][ed + '_sense'] = theano.shared(
+                        createMatrix(self.args['embs'][ed].astype(theano.config.floatX), self.args['kGivens'],
+                                     ed + '_sense', self.args['word2idDict'], self.args['id2wordDict']))
+                    self.container['embDict'][ed + '_event'] = theano.shared(
+                        createMatrix(self.args['embs'][ed].astype(theano.config.floatX), self.args['kGivens'],
+                                     ed + '_event', self.args['word2idDict'], self.args['id2wordDict']))
+
+                if self.args['updateEmbs']:
+                    print '@@@@@@@ Will update embedding tables'
+                    self.container['params'] += [self.container['embDict'][ed + '_sense'],
+                                                 self.container['embDict'][ed + '_event']]
+                    self.container['names'] += [ed + '_sense', ed + '_event']
+
+            if self.args['features'][ed] == 0:
+                self.container['vars'][ed] = T.imatrix()
+                dimAdding = self.args['embs'][ed].shape[1]
+                self.container['dimIn'] += dimAdding
+            elif self.args['features'][ed] == 1:
+                self.container['vars'][ed] = T.tensor3()
+                dimAdding = self.args['features_dim'][ed]
+                self.container['dimIn'] += dimAdding
+
+            if self.args['features'][ed] >= 0:
+                print 'represetation - ', ed, ' : ', dimAdding
+
+        print 'REPRESENTATION DIMENSION = ', self.container['dimIn']
+
+        self.container['keys'] = T.ivector('keys')  # label
+        self.container['candidates'] = T.imatrix('candidates')  # label
+        self.container['lr'] = T.scalar('lr')
+        self.container['anchor'] = T.ivector('anchorPosition')
+        self.container['binaryFeatures'] = T.imatrix('binaryFeatures')
+        self.container['zeroVector'] = T.vector('zeroVector')
+
+        fetre_sense, fetre_dropout_sense, _ = self.getRep('sense')
+        fetre_event, fetre_dropout_event, dim_inter = self.getRep('event')
+        self.buildFunctionsTwoNets(fetre_sense, fetre_dropout_sense, fetre_event, fetre_dropout_event, dim_inter)
+
+    def getRep(self, suffix):
+        fetre, dim_inter = eval(self.args['model'] + '_suffix')(self, suffix)
+
+        if self.args['wedWindow'] > 0:
+            rep, dim_rep = localWordEmbeddingsTriggerSuffix(self, suffix)
+            fetre = T.concatenate([fetre, rep], axis=1)
+            dim_inter += dim_rep
+
+        fetre_dropout = _dropout_from_layer(self.args['rng'], [fetre], self.args['dropout'])
+        fetre_dropout = fetre_dropout[0]
+
+        hids = [dim_inter] + self.args['multilayerNN1']
+
+        mul = MultiHiddenLayers([fetre, fetre_dropout], hids, self.container['params'], self.container['names'],
+                                'multiMainModel_' + suffix, kGivens=self.args['kGivens'])
+
+        fetre, fetre_dropout = mul[0], mul[1]
+        dim_inter = hids[len(hids) - 1]
+        return fetre, fetre_dropout, dim_inter
+
+    def buildFunctionsTwoNets(self, fetre_sense, fetre_dropout_sense, fetre_event, fetre_dropout_event, dim_inter):
+        softmaxWSense = theano.shared(
+            createMatrix(randomMatrix(self.args['numSenses'], dim_inter), self.args['kGivens'],
+                         'sofmaxMainModel_W_Sense'))
+        softmaxbSense = theano.shared(
+            createMatrix(numpy.zeros(self.args['numSenses'], dtype=theano.config.floatX), self.args['kGivens'],
+                         'sofmaxMainModel_b_Sense'))
+        softmaxWEvent = theano.shared(
+            createMatrix(randomMatrix(self.args['numSenses'], dim_inter), self.args['kGivens'],
+                         'sofmaxMainModel_W_Event'))
+        softmaxbEvent = theano.shared(
+            createMatrix(numpy.zeros(self.args['numSenses'], dtype=theano.config.floatX), self.args['kGivens'],
+                         'sofmaxMainModel_b_Event'))
+
+        self.container['params'] += [softmaxWSense, softmaxbSense, softmaxWEvent, softmaxbEvent]
+        self.container['names'] += ['sofmaxMainModel_W_Sense', 'sofmaxMainModel_b_Sense',
+                                    'sofmaxMainModel_W_Event', 'sofmaxMainModel_b_Event']
+
+        def recurTrain(_rep_dropout_sense, _rep_dropout_event, _cands, _key, _fWSense, _fbSense, _fWEvent, _fbEvent):
+            _WSense = _fWSense[_cands[1:(_cands[0] + 1)]]
+            _bSense = _fbSense[_cands[1:(_cands[0] + 1)]]
+            _xSense = T.dot(_WSense, _rep_dropout_sense) + _bSense
+            _p_y_given_x_dropout_sense = T.nnet.softmax(_xSense)[0]
+
+            _WEvent = _fWEvent[_cands[1:(_cands[0] + 1)]]
+            _bEvent = _fbEvent[_cands[1:(_cands[0] + 1)]]
+            _xEvent = T.dot(_WEvent, _rep_dropout_event) + _bEvent
+            _p_y_given_x_dropout_event = T.nnet.softmax(_xEvent)[0]
+
+            return _p_y_given_x_dropout_sense[_key], _p_y_given_x_dropout_event[_key], T.sum((_xEvent - _xSense) ** 2), _cands[0]
+
+        sscores, _ = theano.scan(fn=recurTrain,
+                                 sequences=[fetre_dropout_sense, fetre_dropout_event, self.container['candidates'], self.container['keys']],
+                                 outputs_info=[None, None, None, None],
+                                 non_sequences=[softmaxWSense, softmaxbSense, softmaxWEvent, softmaxbEvent],
+                                 n_steps=fetre_dropout_sense.shape[0])
+
+        def recurTest(_rep_sense, _rep_event, _cands, _fWSense, _fbSense, _fWEvent, _fbEvent):
+            _WSense = _fWSense[_cands[1:(_cands[0] + 1)]]
+            _bSense = _fbSense[_cands[1:(_cands[0] + 1)]]
+            _p_y_given_x_sense = T.nnet.softmax(T.dot((1.0 - self.args['dropout']) * _WSense, _rep_sense) + _bSense)[0]
+            _id_sense = T.argmax(_p_y_given_x_sense)
+
+            _WEvent = _fWEvent[_cands[1:(_cands[0] + 1)]]
+            _bEvent = _fbEvent[_cands[1:(_cands[0] + 1)]]
+            _p_y_given_x_event = T.nnet.softmax(T.dot((1.0 - self.args['dropout']) * _WEvent, _rep_event) + _bEvent)[0]
+            _id_event = T.argmax(_p_y_given_x_event)
+
+            return _cands[1 + _id_sense], _cands[1 + _id_event]
+
+        spreds, _ = theano.scan(fn=recurTest,
+                                sequences=[fetre_sense, fetre_event, self.container['candidates']],
+                                outputs_info=[None, None],
+                                non_sequences=[softmaxWSense, softmaxbSense, softmaxWEvent, softmaxbEvent],
+                                n_steps=fetre_sense.shape[0])
+
+        diff = self.args['lamb'] * T.sum(sscores[2]) / T.sum(sscores[3])
+        nll_sense = -T.mean(T.log(sscores[0])) + diff
+        nll_event = -T.mean(T.log(sscores[1])) + diff
+
+        if self.args['regularizer'] > 0.:
+            for pp, nn in zip(self.container['params'], self.container['names']):
+                if 'multi' in nn:
+                    nll_sense += self.args['regularizer'] * (pp ** 2).sum()
+                    nll_event += self.args['regularizer'] * (pp ** 2).sum()
+
+        y_pred_sense = spreds[0]
+        y_pred_event = spreds[1]
+
+        gradients_sense = T.grad(nll_sense, self.container['params'])
+        gradients_event = T.grad(nll_event, self.container['params'])
+
+        classifyInput = [self.container['vars'][ed] for ed in self.args['features'] if self.args['features'][ed] >= 0]
+        classifyInput += [self.container['anchor']]
+
+        if self.args['useBinaryFeatures']:
+            classifyInput += [self.container['binaryFeatures']]
+
+        classifyInput += [self.container['candidates']]
+
+        # theano functions
+        self.pred_wsd = theano.function(inputs=classifyInput, outputs=y_pred_sense, on_unused_input='ignore')
+        self.pred_event = theano.function(inputs=classifyInput, outputs=y_pred_event, on_unused_input='ignore')
+
+        trainInput = classifyInput + [self.container['keys']]
+
+        self.f_grad_shared_sense, self.f_update_param_sense = eval(self.args['optimizer'])(trainInput, nll_sense,
+                                                                                           self.container['names'],
+                                                                                           self.container['params'],
+                                                                                           gradients_sense,
+                                                                                           self.container['lr'],
+                                                                                           self.args['norm_lim'])
+        self.f_grad_shared_event, self.f_update_param_event = eval(self.args['optimizer'])(trainInput, nll_event,
+                                                                                           self.container['names'],
+                                                                                           self.container['params'],
+                                                                                           gradients_event,
+                                                                                           self.container['lr'],
+                                                                                           self.args['norm_lim'])
+
+        self.container['setZero'] = OrderedDict()
+        self.container['zeroVecs'] = OrderedDict()
+        for ed in self.container['embDict']:
+            ed_fea = ed.split('_')[0]
+            self.container['zeroVecs'][ed] = numpy.zeros(self.args['embs'][ed_fea].shape[1], dtype='float32')
+            self.container['setZero'][ed] = theano.function([self.container['zeroVector']],
+                                                            updates=[(self.container['embDict'][ed],
+                                                                      T.set_subtensor(self.container['embDict'][ed][0,:],
+                                                                                      self.container['zeroVector']))])
+
+    def save(self, folder):
+        storer = {}
+        storer['storingDicts'] = {}
+        for param, name in zip(self.container['params'], self.container['names']):
+            storer[name] = param.get_value()
+        #storer['binaryFeatureDict'] = self.args['binaryFeatureDict']
+        #storer['window'] = self.args['window']
+        storer['storingDicts']['word2idDict'] = self.args['word2idDict']
+        storer['storingDicts']['id2wordDict'] = self.args['id2wordDict']
+        sp = folder
+        print 'saving parameters to: ', sp
+        cPickle.dump(storer, open(sp, "wb"))
+        #for param, name in zip(self.container['params'], self.container['names']):
+        #    numpy.save(os.path.join(folder, name + '.npy'), param.get_value())
 
 def alternateHead(model):
 
@@ -976,6 +1233,18 @@ def convolute(model):
         
     dim_conv = model.args['conv_feature_map'] * len(model.args['conv_win_feature_map'])
     
+    return fConv, dim_conv
+
+def convolute_suffix(model, suffix):
+    _x = getConcatenationSuffix(model.container['embDict'], model.container['vars'], model.args['features'],
+                          model.args['features_dim'], suffix, tranpose=False)
+
+    fConv = convContext(_x, model.args['conv_feature_map'], model.args['conv_win_feature_map'], model.args['batch'],
+                        model.args['conv_winre'], model.container['dimIn'], 'convolute_' + suffix, model.container['params'],
+                        model.container['names'], kGivens=model.args['kGivens'])
+
+    dim_conv = model.args['conv_feature_map'] * len(model.args['conv_win_feature_map'])
+
     return fConv, dim_conv
     
 def nonConsecutiveConvolute(model):

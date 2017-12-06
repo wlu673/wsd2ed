@@ -26,6 +26,7 @@ def main(params):
           nhidden = params['nhidden'],
           conv_feature_map = params['conv_feature_map'],
           conv_win_feature_map = params['conv_win_feature_map'],
+          lamb=params['lamb'],
           seed = params['seed'],
           #emb_dimension=300, # dimension of word embedding
           nepochs = params['nepochs'],
@@ -66,6 +67,7 @@ def argsp():
     aparser.add_argument('--nhidden', help='number of hidden units', type=int)
     aparser.add_argument('--conv_feature_map', help='number of filters for convolution', type=int)
     aparser.add_argument('--conv_win_feature_map', help='windows for filters for convolution', type=int, nargs='+')
+    aparser.add_argument('--lamb', help='strength of regularization for the difference of two nets', type=float)
     aparser.add_argument('--seed', help='random seed', type=int)
     aparser.add_argument('--nepochs', help='number of iterations to run', type=int)
     
@@ -75,9 +77,9 @@ def argsp():
 
 if __name__=='__main__':
     
-    pars={'dataset_path' : '/scratch/wl1191/wsd2ed/data/Semcor',
-          'embedding_path' : '/scratch/wl1191/wsd2ed/data/Semcor_processed/word2vec.pkl.fetFreq2.SemcorACE.NoShuffled.pkl',
-          'model' : 'convolute', # convolute # rnnHead, rnnMax, rnnHeadFf, rnnMaxFf, rnnHeadForward, rnnHeadBackward, rnnMaxForward, rnnMaxBackward, rnnHeadFfForward, rnnHeadFfBackward, rnnMaxFfForward, rnnMaxFfBackward # alternateHead, alternateMax, alternateConv, nonConsecutiveConvolute, rnnHeadNonConsecutiveConv
+    pars={'dataset_path' : '/scratch/wl1191/wsd2ed2/data/Semcor',
+          'embedding_path' : '/scratch/wl1191/wsd2ed2/data/Semcor_processed/word2vec.pkl.fetFreq2.SemcorACE.NoShuffled.pkl',
+          'model' : 'convolute2', # convolute # rnnHead, rnnMax, rnnHeadFf, rnnMaxFf, rnnHeadForward, rnnHeadBackward, rnnMaxForward, rnnMaxBackward, rnnHeadFfForward, rnnHeadFfBackward, rnnMaxFfForward, rnnMaxFfBackward # alternateHead, alternateMax, alternateConv, nonConsecutiveConvolute, rnnHeadNonConsecutiveConv
           'wedWindow' : 2,
           'expected_features' : OrderedDict([('anchor', 0),
                                             ]),
@@ -97,6 +99,7 @@ if __name__=='__main__':
           'nhidden' : 300,
           'conv_feature_map' : 300,
           'conv_win_feature_map' : [2,3,4,5],
+          'lamb': 0.01,
           'seed' : 3435,
           'nepochs' : 20,
           'folder' : './res'}
