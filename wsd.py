@@ -69,8 +69,10 @@ def predict(ncp, corpus, wsdModel, dictionaries, embeddings, features, anchorMat
         zippedCorpus, oneRev = prepareData(oneBatch, embeddings, dictionaries, features, anchorMat, useBinaryFeatures)
 
         if 'sense' in ncp:
+            print 'Predicting using the wsd network for', ncp
             disams = wsdModel.pred_wsd(*zippedCorpus[0:-1])
         else:
+            print 'Predicting using the ed network for', ncp
             disams = wsdModel.pred_event(*zippedCorpus[0:-1])
         
         if state <= 0: state = len(disams)
@@ -121,7 +123,7 @@ def score(predFile, keyFile, ncp):
     
     return {'p' : p, 'r' : r, 'f1' : f}
 
-def generateParameterFileName(model, expected_features, contextLength, nhidden, conv_feature_map, conv_win_feature_map):
+def generateParameterFileName(model, expected_features, contextLength, nhidden, conv_feature_map, conv_win_feature_map, lamb):
     res = model
     res += '.cw-'
     for fe in expected_features: res += str(expected_features[fe])
@@ -130,6 +132,7 @@ def generateParameterFileName(model, expected_features, contextLength, nhidden, 
     res += '.cf-' + str(conv_feature_map)
     res += '.cwf-'
     for wi in conv_win_feature_map: res += str(wi)
+    res += '.lamb-' + str(lamb)
     return res
 
 def train(dataset_path='',
@@ -175,7 +178,7 @@ def train(dataset_path='',
     if not os.path.exists(folder): os.mkdir(folder)
     if not os.path.exists(paramFolder): os.mkdir(paramFolder)
     
-    paramFileName = paramFolder + '/' + generateParameterFileName(model, expected_features, contextLength, nhidden, conv_feature_map, conv_win_feature_map)
+    paramFileName = paramFolder + '/' + generateParameterFileName(model, expected_features, contextLength, nhidden, conv_feature_map, conv_win_feature_map, lamb)
 
     print 'loading embeddings and dictionaries: ', embedding_path, ' ...'
     embeddings, dictionaries = cPickle.load(open(embedding_path, 'rb'))

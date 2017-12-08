@@ -130,6 +130,7 @@ if __name__=='__main__':
              + '.cl_' + str(pars['contextLength']) \
              + '.cvft_' + str(pars['conv_feature_map']) \
              + '.cvfm_' + fmStr(pars['conv_win_feature_map']) \
+             + '.lamb_' + str(pars['lamb']) \
              + '.lr_' + str(pars['lr']) \
              + '.norm_' + str(pars['norm_lim']) \
              + '.s_' + str(pars['seed'])
