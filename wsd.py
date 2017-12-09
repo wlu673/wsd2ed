@@ -61,7 +61,11 @@ def prepareData(rev, embeddings, dictionaries, features, anchorMat, useBinaryFea
     return npdat, rev
 
 def predict(ncp, corpus, wsdModel, dictionaries, embeddings, features, anchorMat, useBinaryFeatures, idx2sense, outFile):
-
+    if 'sense' in ncp:
+        print 'Predicting using the wsd network for', ncp
+    else:
+        print 'Predicting using the ed network for', ncp
+        
     wrdTypes, insIds, predictions = [], [], []
     for oneBatch, state in corpus:
         if not oneBatch['isValid']: break
@@ -69,10 +73,8 @@ def predict(ncp, corpus, wsdModel, dictionaries, embeddings, features, anchorMat
         zippedCorpus, oneRev = prepareData(oneBatch, embeddings, dictionaries, features, anchorMat, useBinaryFeatures)
 
         if 'sense' in ncp:
-            print 'Predicting using the wsd network for', ncp
             disams = wsdModel.pred_wsd(*zippedCorpus[0:-1])
         else:
-            print 'Predicting using the ed network for', ncp
             disams = wsdModel.pred_event(*zippedCorpus[0:-1])
         
         if state <= 0: state = len(disams)

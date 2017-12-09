@@ -99,7 +99,7 @@ if __name__=='__main__':
           'nhidden' : 300,
           'conv_feature_map' : 300,
           'conv_win_feature_map' : [2,3,4,5],
-          'lamb': 0.01,
+          'lamb': 0.,
           'seed' : 3435,
           'nepochs' : 20,
           'folder' : './res'}
