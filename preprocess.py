@@ -193,8 +193,8 @@ def main():
     
     dictionaries = {}
     dictionaries['word'] = word_idx_map
-    dictionaries['eventTypeId'] = makeDict(eventCounter)
-    dictionaries['senseId'] = makeDict(senseCounter, False)
+    dictionaries['eventTypeId'] = makeDict(eventCounter, False)
+    dictionaries['senseId'] = makeDict(senseCounter)
     dictionaries['featureId'] = makeDict(fetCounter, False, fetFreq)
     print 'number of features: ', len(dictionaries['featureId'])
     print 'number of eventTypes: ', len(dictionaries['eventTypeId'])

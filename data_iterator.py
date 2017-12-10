@@ -31,35 +31,35 @@ class TextIterator:
 
         self.batch_size = batch_size
         self.maxLenContext = maxLenContext
-        
+
         self.toPredict = toPredict
-        
+
         self.buffer_instanceIds = []
         self.buffer_wordTypes = []
 
         self.buffer_words = []
-        
+
         self.buffer_anchors = []
-        
+
         self.buffer_keys = []
         self.buffer_candidates = []
-        
+
         self.buffer_features = []
-        
+
         self.oneBat_buffer_instanceIds = []
         self.oneBat_buffer_wordTypes = []
 
         self.oneBat_buffer_words = []
-        
+
         self.oneBat_buffer_anchors = []
-        
+
         self.oneBat_buffer_keys = []
         self.oneBat_buffer_candidates = []
-        
+
         self.oneBat_buffer_features = []
-        
+
         self.k = batch_size * 100 #20
-        
+
         self.insIds = [''] * batch_size
         self.wrdTypes = [''] * batch_size
         self.words = np.zeros((batch_size, self.maxLenContext), dtype='int32')
@@ -67,39 +67,39 @@ class TextIterator:
         self.keys = np.zeros((batch_size,), dtype='int32')
         self.candidates = np.zeros((batch_size, self.maxCandidateSense + 1), dtype='int32')
         self.binaryFeatures = np.zeros((batch_size, self.maxNumFeature + 1), dtype='int32')
-                
+
     def __iter__(self):
         return self
 
     def reset(self):
         self.dataset.seek(0)
-        
+
         self.oneBat_buffer_instanceIds = []
         self.oneBat_buffer_wordTypes = []
 
         self.oneBat_buffer_words = []
-        
+
         self.oneBat_buffer_anchors = []
-        
+
         self.oneBat_buffer_keys = []
         self.oneBat_buffer_candidates = []
-        
+
         self.oneBat_buffer_features = []
-        
+
     def next(self):
 
         # fill buffers, if it's empty
-        
+
         if len(self.buffer_words) < self.batch_size:
-        
+
             while True:
                 if len(self.buffer_words) >= self.k: break
-                
+
                 line = self.dataset.readline().strip()
                 if not line: break
-                
+
                 els = line.split('\t')
-                
+
                 insId = els[0]
                 wordType = els[1]
                 words = els[2]
@@ -107,9 +107,9 @@ class TextIterator:
                 skey = els[4]
                 scands = els[5]
                 features = els[6]
-                
+
                 if skey not in scands.split(';') and not self.toPredict: continue
-                
+
                 self.buffer_instanceIds.append(insId)
                 self.buffer_wordTypes.append(wordType)
                 self.buffer_words.append(words)
@@ -117,7 +117,7 @@ class TextIterator:
                 self.buffer_keys.append(skey)
                 self.buffer_candidates.append(scands)
                 self.buffer_features.append(features)
-            
+
             if not self.toPredict:
                 seedRand = random.randint(0,999999)
                 random.seed(seedRand)
@@ -134,11 +134,11 @@ class TextIterator:
                 shuffle(self.buffer_candidates)
                 random.seed(seedRand)
                 shuffle(self.buffer_features)
-                
+
             if len(self.oneBat_buffer_instanceIds) < self.batch_size:
                 for ti in range(self.batch_size-len(self.oneBat_buffer_instanceIds)):
                     if ti >= len(self.buffer_instanceIds): break
-                        
+
                     self.oneBat_buffer_instanceIds.append(self.buffer_instanceIds[ti])
                     self.oneBat_buffer_wordTypes.append(self.buffer_wordTypes[ti])
                     self.oneBat_buffer_words.append(self.buffer_words[ti])
@@ -146,13 +146,13 @@ class TextIterator:
                     self.oneBat_buffer_keys.append(self.buffer_keys[ti])
                     self.oneBat_buffer_candidates.append(self.buffer_candidates[ti])
                     self.oneBat_buffer_features.append(self.buffer_features[ti])
-        
+
         state = -1
 
         if len(self.buffer_words) < self.batch_size:
             if len(self.buffer_words) > 0:
                 state = len(self.buffer_words)
-                
+
                 for ti in range(self.batch_size - len(self.buffer_words)):
                     self.buffer_instanceIds.insert(0, self.oneBat_buffer_instanceIds[ti])
                     self.buffer_wordTypes.insert(0, self.oneBat_buffer_wordTypes[ti])
@@ -171,17 +171,17 @@ class TextIterator:
                         'keys' : None,
                         'candidates' : None,
                         'binaryFeatures' : None}, -1
-        
+
         self.words[::] = 0
         self.keys[:] = 0
         self.candidates[::] = 0
         self.binaryFeatures[::] = -1
         self.insAnchors[::] = 0
         for i in range(self.batch_size):
-        
+
             self.insIds[i] = self.buffer_instanceIds.pop()
             self.wrdTypes[i] = self.buffer_wordTypes.pop()
-        
+
             aa = self.buffer_anchors.pop()
             ws = self.buffer_words.pop().split()
             for wid in range(self.maxLenContext):
@@ -198,7 +198,7 @@ class TextIterator:
                 self.candidates[i][0] = len(icands)
                 for icid in range(len(icands)):
                     self.candidates[i][1+icid] = self.senseDict[icands[icid]]
-            
+
             ikeys = self.buffer_keys.pop().split(';')
             ikey = None
             if 'event' in self.name:
@@ -206,7 +206,7 @@ class TextIterator:
                     if ik in self.eventTypeDict:
                         ikey = self.eventTypeDict[ik]
                         break
-                if not ikey:
+                if ikey is None:
                     print 'cannot find eventTypeKey in dict: ', ikeys
                     exit()
             else:
@@ -230,7 +230,7 @@ class TextIterator:
                     print 'cannot find key in candidate list: '
                     exit()
             self.keys[i] = iorder
-            
+
             sfets = self.buffer_features.pop().split()
             sfc = 0
             for sf in sfets:
@@ -238,7 +238,7 @@ class TextIterator:
                     sfc += 1
                     self.binaryFeatures[i][sfc] = self.featureDict[sf]
             self.binaryFeatures[i][0] = sfc
-            
+
         return {'isValid': 'OK',
                 'insIds' : self.insIds,
                 'wrdTypes' : self.wrdTypes,
