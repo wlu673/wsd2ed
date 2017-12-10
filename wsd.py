@@ -60,7 +60,7 @@ def prepareData(rev, embeddings, dictionaries, features, anchorMat, useBinaryFea
         
     return npdat, rev
 
-def predict(ncp, corpus, wsdModel, dictionaries, embeddings, features, anchorMat, useBinaryFeatures, idx2sense, outFile):
+def predict(ncp, corpus, wsdModel, dictionaries, embeddings, features, anchorMat, useBinaryFeatures, idx2eventType, idx2sense, outFile):
     if 'sense' in ncp:
         print 'Predicting using the wsd network for', ncp
     else:
@@ -76,10 +76,13 @@ def predict(ncp, corpus, wsdModel, dictionaries, embeddings, features, anchorMat
             disams = wsdModel.pred_wsd(*zippedCorpus[0:-1])
         else:
             disams = wsdModel.pred_event(*zippedCorpus[0:-1])
-        
+
         if state <= 0: state = len(disams)
-        
-        disams = [ idx2sense[d] for d in disams[0:state] ]
+
+        if 'sense' in ncp:
+            disams = [ idx2sense[d] for d in disams[0:state] ]
+        else:
+            disams = [idx2eventType[d] for d in disams[0:state]]
         
         predictions += disams
         insIds += oneRev['insIds'][0:state]
@@ -186,6 +189,7 @@ def train(dataset_path='',
     embeddings, dictionaries = cPickle.load(open(embedding_path, 'rb'))
     
     idx2word  = dict((k,v) for v,k in dictionaries['word'].iteritems())
+    idx2eventType = dict((k, v) for v, k in dictionaries['eventTypeId'].iteritems())
     idx2sense  = dict((k,v) for v,k in dictionaries['senseId'].iteritems())
 
     emb_dimension = embeddings['word'].shape[1]
@@ -215,7 +219,8 @@ def train(dataset_path='',
     datasetNames = ['senseTrain', 'eventTrain', 'senseValid', 'sense02', 'sense03', 'sense07', 'eventValid', 'eventTest']
     datasets = {}
     for dn in datasetNames:
-        datasets[dn] = TextIterator(dataset_path + '/' + dn + '.dat',
+        datasets[dn] = TextIterator(dn,
+                                    dataset_path + '/' + dn + '.dat',
                                     dictionaries,
                                     batch_size=batch,
                                     maxLenContext=contextLength,
@@ -240,6 +245,7 @@ def train(dataset_path='',
               'features_dim' : features_dim,
               'conv_winre' : contextLength,
               'numSenses' : len(dictionaries['senseId'])+1,
+              'numEventTypes': len(dictionaries['eventTypeId']),
               'binaryFeatureDim' : len(dictionaries['featureId']),
               'word2idDict' : dictionaries['word'],
               'id2wordDict' : idx2word,
@@ -277,11 +283,11 @@ def train(dataset_path='',
     trainDataSense = datasets['senseTrain']
     trainDataEvent = datasets['eventTrain']
     evaluatingDataset = OrderedDict([
-                                     ('senseValid', datasets['senseValid']),
+                                     # ('senseValid', datasets['senseValid']),
                                      ('sense02', datasets['sense02']),
-                                     ('sense03', datasets['sense03']),
-                                     ('sense07', datasets['sense07']),
-                                     ('eventValid', datasets['eventValid']),
+                                     # ('sense03', datasets['sense03']),
+                                     # ('sense07', datasets['sense07']),
+                                     # ('eventValid', datasets['eventValid']),
                                      ('eventTest', datasets['eventTest']),
                                      ])
     
@@ -352,7 +358,7 @@ def train(dataset_path='',
         print 'evaluating in epoch: ', e
 
         for elu in evaluatingDataset:
-            _perfs[elu] = predict(elu, evaluatingDataset[elu], wsdModel, dictionaries, embeddings, features, anchorMat, useBinaryFeatures, idx2sense, folder + '/' + elu + '.pred' + str(e))
+            _perfs[elu] = predict(elu, evaluatingDataset[elu], wsdModel, dictionaries, embeddings, features, anchorMat, useBinaryFeatures, idx2eventType, idx2sense, folder + '/' + elu + '.pred' + str(e))
         
         perPrint(_perfs)
         

@@ -78,7 +78,7 @@ def argsp():
 if __name__=='__main__':
     
     pars={'dataset_path' : '/scratch/wl1191/wsd2ed2/data/Semcor',
-          'embedding_path' : '/scratch/wl1191/wsd2ed2/data/Semcor_processed/word2vec.pkl.fetFreq2.SemcorACE.NoShuffled.pkl',
+          'embedding_path' : '/scratch/wl1191/wsd2ed2/data/Semcor_processed/text.fetFreq2.SemcorACE.NoShuffled.TwoNets.pkl',
           'model' : 'convolute2', # convolute # rnnHead, rnnMax, rnnHeadFf, rnnMaxFf, rnnHeadForward, rnnHeadBackward, rnnMaxForward, rnnMaxBackward, rnnHeadFfForward, rnnHeadFfBackward, rnnMaxFfForward, rnnMaxFfBackward # alternateHead, alternateMax, alternateConv, nonConsecutiveConvolute, rnnHeadNonConsecutiveConv
           'wedWindow' : 2,
           'expected_features' : OrderedDict([('anchor', 0),
@@ -99,7 +99,7 @@ if __name__=='__main__':
           'nhidden' : 300,
           'conv_feature_map' : 300,
           'conv_win_feature_map' : [2,3,4,5],
-          'lamb': 0.,
+          'lamb': 0.01,
           'seed' : 3435,
           'nepochs' : 20,
           'folder' : './res'}

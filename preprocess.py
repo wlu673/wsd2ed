@@ -21,11 +21,13 @@ def lookup(mess, key, gdict, addOne):
 
 def readInputFiles(iFolder):
     
-    datNames = ['train', 'valid', 'sense02', 'sense03', 'sense07', 'eventTest', 'eventValid']
+    datNames = ['eventTrain', 'senseTrain', 'senseValid', 'sense02', 'sense03', 'sense07', 'eventTest', 'eventValid']
     maxLens = defaultdict(int)
-    maxCandidate = -1
+    maxCandidateEvent = -1
+    maxCandidateSense = -1
     maxNumFeature = -1
     wordCounter = defaultdict(int)
+    eventCounter = defaultdict(int)
     senseCounter = defaultdict(int)
     fetCounter = defaultdict(int)
     
@@ -38,26 +40,39 @@ def readInputFiles(iFolder):
                 words = els[2].split()
                 for w in words: wordCounter[w.lower()] += 1
                 if maxLens['xWords'] < len(words): maxLens['xWords'] = len(words)
+
+                if 'event' in datName:
+                    for etype in els[4].split(';'):
+                        eventCounter[etype] += 1
+                    for etype in els[5].split(';'):
+                        eventCounter[etype] += 1
+                    if len(els[5].split(';')) > maxCandidateEvent:
+                        maxCandidateEvent = len(els[5].split(';'))
+                else:
+                    for sense in els[4].split(';'):
+                        senseCounter[sense] += 1
+                    for sense in els[5].split(';'):
+                        senseCounter[sense] += 1
+                    if len(els[5].split(';')) > maxCandidateSense:
+                        maxCandidateSense = len(els[5].split(';'))
                 
-                for sen in els[4].split(';'): senseCounter[sen] += 1
-                for sen in els[5].split(';'): senseCounter[sen] += 1
-                
-                if len(els[5].split(';')) > maxCandidate: maxCandidate = len(els[5].split(';'))
-                
-                if len(els[6].split()) > maxNumFeature: maxNumFeature = len(els[6].split())
+                if len(els[6].split()) > maxNumFeature:
+                    maxNumFeature = len(els[6].split())
                 
                 if 'sense' not in datName and datName != 'eventTest':
                     for fet in els[6].split(): fetCounter[fet] += 1
     
     print 'number of words in counter: ', len(wordCounter)
+    print 'number of event types in counter: ', len(eventCounter)
     print 'number of senses in counter: ', len(senseCounter)
     print 'number of features in counter: ', len(fetCounter)
     print '------maxLen----'
     for k in maxLens: print k, ' : ', maxLens[k]
-    print 'maximum number of candidates: ', maxCandidate
+    print 'maximum number of event candidates: ', maxCandidateEvent
+    print 'maximum number of sense candidates: ', maxCandidateSense
     print 'maximum number of features: ', maxNumFeature
     
-    return maxLens, wordCounter, senseCounter, fetCounter, maxCandidate, maxNumFeature
+    return maxLens, wordCounter, eventCounter, senseCounter, fetCounter, maxCandidateEvent, maxCandidateSense, maxNumFeature
 
 def get_W(word_vecs, k=300):
     """
@@ -147,22 +162,21 @@ def makeDict(counter, addOne=True, freq=1):
     return res
 
 def main():
-    embType = sys.argv[1]
-    w2v_file = sys.argv[2]
-    iFolder = sys.argv[3]
-    oFolder = sys.argv[4]
-    
-    fetFreq = 1
-    if len(sys.argv) >= 6: fetFreq = int(sys.argv[5])
-    
-    maxLens, wordCounter, senseCounter, fetCounter, maxCandidate, maxNumFeature = readInputFiles(iFolder)
+    embType = 'text'
+    w2v_file_bin = '/scratch/wl1191/wsd2ed/data/GoogleNews-vectors-negative300.bin'
+    w2v_file_text = '/scratch/wl1191/wsd2ed/data/concatEmbeddings.txt'
+    iFolder = '/scratch/wl1191/wsd2ed2/data/Semcor'
+    oFolder = '/scratch/wl1191/wsd2ed2/data/Semcor_processed'
+    fetFreq = 2
+
+    maxLens, wordCounter, eventCounter, senseCounter, fetCounter, maxCandidateEvent, maxCandidateSense, maxNumFeature = readInputFiles(iFolder)
     
     print "loading word embeddings...",
     dimEmb = 300
     if embType == 'word2vec':
-        dimEmb, w2v = load_bin_vec(w2v_file, wordCounter)
+        dimEmb, w2v = load_bin_vec(w2v_file_bin, wordCounter)
     else:
-        dimEmb, w2v = load_text_vec(w2v_file, wordCounter)
+        dimEmb, w2v = load_text_vec(w2v_file_text, wordCounter)
     print "word embeddings loaded!"
     print "num words already in word embeddings: " + str(len(w2v))
     
@@ -179,15 +193,18 @@ def main():
     
     dictionaries = {}
     dictionaries['word'] = word_idx_map
-    dictionaries['senseId'] = makeDict(senseCounter)
+    dictionaries['eventTypeId'] = makeDict(eventCounter)
+    dictionaries['senseId'] = makeDict(senseCounter, False)
     dictionaries['featureId'] = makeDict(fetCounter, False, fetFreq)
     print 'number of features: ', len(dictionaries['featureId'])
+    print 'number of eventTypes: ', len(dictionaries['eventTypeId'])
     print 'number of senses: ', len(dictionaries['senseId'])
-    dictionaries['maxCandidate'] = maxCandidate
+    dictionaries['maxCandidateEvent'] = maxCandidateEvent
+    dictionaries['maxCandidateSense'] = maxCandidateSense
     dictionaries['maxNumFeature'] = maxNumFeature
     
     print 'dumping ...'
-    cPickle.dump([embeddings, dictionaries], open(oFolder + '/' + embType + '.pkl', 'wb'))
+    cPickle.dump([embeddings, dictionaries], open(oFolder + '/' + embType + '.fetFreq2.SemcorACE.NoShuffled.TwoNets.pkl', 'wb'))
     print "dataset created!"
 
 if __name__=='__main__':

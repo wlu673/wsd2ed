@@ -12,16 +12,21 @@ def fopen(filename, mode='r'):
 
 
 class TextIterator:
-    def __init__(self, datasetFile,
+    def __init__(self,
+                 datasetName,
+                 datasetFile,
                  dictionaries,
                  batch_size=50,
                  maxLenContext=31,
                  toPredict=False):
+        self.name = datasetName
         self.dataset = fopen(datasetFile, 'r')
         self.wordDict = dictionaries['word']
+        self.eventTypeDict = dictionaries['eventTypeId']
         self.senseDict = dictionaries['senseId']
         self.featureDict = dictionaries['featureId']
-        self.maxCandidate = dictionaries['maxCandidate']
+        self.maxCandidateEvent = dictionaries['maxCandidateEvent']
+        self.maxCandidateSense = dictionaries['maxCandidateSense']
         self.maxNumFeature = dictionaries['maxNumFeature']
 
         self.batch_size = batch_size
@@ -60,7 +65,7 @@ class TextIterator:
         self.words = np.zeros((batch_size, self.maxLenContext), dtype='int32')
         self.insAnchors = np.zeros((batch_size,), dtype='int32')
         self.keys = np.zeros((batch_size,), dtype='int32')
-        self.candidates = np.zeros((batch_size, self.maxCandidate + 1), dtype='int32')
+        self.candidates = np.zeros((batch_size, self.maxCandidateSense + 1), dtype='int32')
         self.binaryFeatures = np.zeros((batch_size, self.maxNumFeature + 1), dtype='int32')
                 
     def __iter__(self):
@@ -183,33 +188,47 @@ class TextIterator:
                 if (wid+aa-self.maxLenContext/2) >= 0 and (wid+aa-self.maxLenContext/2) < len(ws):
                     self.words[i][wid] = self.wordDict[ws[wid+aa-self.maxLenContext/2]] if ws[wid+aa-self.maxLenContext/2] in self.wordDict else 1
             self.insAnchors[i] = self.maxLenContext/2
-            
-            icands = self.buffer_candidates.pop().split(';')
-            for ic in icands:
-                if ic not in self.senseDict:
-                    print 'cannot find senseCandidate in dict: ', ic
-                    exit()
-            self.candidates[i][0] = len(icands)
-            for icid in range(len(icands)):
-                self.candidates[i][1+icid] = self.senseDict[icands[icid]]
+
+            if 'sense' in self.name:
+                icands = self.buffer_candidates.pop().split(';')
+                for ic in icands:
+                    if ic not in self.senseDict:
+                        print 'cannot find senseCandidate in dict: ', ic
+                        exit()
+                self.candidates[i][0] = len(icands)
+                for icid in range(len(icands)):
+                    self.candidates[i][1+icid] = self.senseDict[icands[icid]]
             
             ikeys = self.buffer_keys.pop().split(';')
             ikey = None
-            for ik in ikeys:
-                if ik in self.senseDict:
-                    ikey = self.senseDict[ik]
-                    break
-            if not ikey:
-                print 'cannot find senseKey in dict: ', ikeys
-                exit()
+            if 'event' in self.name:
+                for ik in ikeys:
+                    if ik in self.eventTypeDict:
+                        ikey = self.eventTypeDict[ik]
+                        break
+                if not ikey:
+                    print 'cannot find eventTypeKey in dict: ', ikeys
+                    exit()
+            else:
+                for ik in ikeys:
+                    if ik in self.senseDict:
+                        ikey = self.senseDict[ik]
+                        break
+                if not ikey:
+                    print 'cannot find senseKey in dict: ', ikeys
+                    exit()
+
             iorder = -1
-            for iid, iod in enumerate(self.candidates[i][ 1:(1+self.candidates[i][0]) ]):
-                if ikey == iod:
-                    iorder = iid
-                    break
-            if iorder == -1 and not self.toPredict:
-                print 'cannot find key in candidate list: '
-                exit()
+            if 'event' in self.name:
+                iorder = ikey
+            else:
+                for iid, iod in enumerate(self.candidates[i][ 1:(1+self.candidates[i][0]) ]):
+                    if ikey == iod:
+                        iorder = iid
+                        break
+                if iorder == -1 and not self.toPredict:
+                    print 'cannot find key in candidate list: '
+                    exit()
             self.keys[i] = iorder
             
             sfets = self.buffer_features.pop().split()
