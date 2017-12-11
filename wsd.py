@@ -283,11 +283,11 @@ def train(dataset_path='',
     trainDataSense = datasets['senseTrain']
     trainDataEvent = datasets['eventTrain']
     evaluatingDataset = OrderedDict([
-                                     # ('senseValid', datasets['senseValid']),
+                                     ('senseValid', datasets['senseValid']),
                                      ('sense02', datasets['sense02']),
-                                     # ('sense03', datasets['sense03']),
-                                     # ('sense07', datasets['sense07']),
-                                     # ('eventValid', datasets['eventValid']),
+                                     ('sense03', datasets['sense03']),
+                                     ('sense07', datasets['sense07']),
+                                     ('eventValid', datasets['eventValid']),
                                      ('eventTest', datasets['eventTest']),
                                      ])
     
