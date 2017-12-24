@@ -1085,6 +1085,142 @@ class twoNetsModel():
         #for param, name in zip(self.container['params'], self.container['names']):
         #    numpy.save(os.path.join(folder, name + '.npy'), param.get_value())
 
+class altModel(BaseModel):
+    def __init__(self, args):
+        BaseModel.__init__(self, args)
+
+        fetre, dim_inter = eval(self.args['model'])(self)
+
+        if self.args['wedWindow'] > 0:
+            rep, dim_rep = localWordEmbeddingsTrigger(self)
+            fetre = T.concatenate([fetre, rep], axis=1)
+            dim_inter += dim_rep
+
+        fetre_dropout = _dropout_from_layer(self.args['rng'], [fetre], self.args['dropout'])
+        fetre_dropout = fetre_dropout[0]
+
+        hids = [dim_inter] + self.args['multilayerNN1']
+
+        mul = MultiHiddenLayers([fetre, fetre_dropout], hids, self.container['params'], self.container['names'],
+                                'multiMainModel', kGivens=self.args['kGivens'])
+
+        fetre, fetre_dropout = mul[0], mul[1]
+
+        dim_inter = hids[len(hids) - 1]
+
+        self.buildFunctionsAlt(fetre, fetre_dropout, dim_inter)
+
+    def buildFunctionsAlt(self, fetre, fetre_dropout, dim_inter):
+        ########################################################################################################
+        # For event detection
+
+        softmaxWEvent = theano.shared(
+            createMatrix(randomMatrix(dim_inter, self.args['numEventTypes']), self.args['kGivens'],
+                         'sofmaxTwoNets_W_Event'))
+        softmaxbEvent = theano.shared(
+            createMatrix(numpy.zeros(self.args['numEventTypes'], dtype=theano.config.floatX), self.args['kGivens'],
+                         'sofmaxTwoNets_b_Event'))
+
+        params_event = self.container['params'] + [softmaxWEvent, softmaxbEvent]
+        names_event = self.container['names'] + ['sofmaxMainModel_W_Event', 'sofmaxMainModel_b_Event']
+
+        scores = T.nnet.softmax(T.dot(fetre_dropout, softmaxWEvent) + softmaxbEvent)
+        nll_event = -T.mean(T.log(scores[T.arange(self.container['keys'].shape[0]), self.container['keys']]))
+
+        probs = T.nnet.softmax(T.dot(fetre, softmaxWEvent) + softmaxbEvent)
+        y_pred_event = T.argmax(probs, axis=1)
+
+        gradients_event = T.grad(nll_event, params_event)
+
+        ########################################################################################################
+        # For word sense disambiguation
+
+        softmaxWSense = theano.shared(
+            createMatrix(randomMatrix(self.args['numSenses'], dim_inter), self.args['kGivens'],
+                         'sofmaxTwoNets_W_Sense'))
+        softmaxbSense = theano.shared(
+            createMatrix(numpy.zeros(self.args['numSenses'], dtype=theano.config.floatX), self.args['kGivens'],
+                         'sofmaxTwoNets_b_Sense'))
+
+        params_sense = self.container['params'] + [softmaxWSense, softmaxbSense]
+        names_sense = self.container['names'] + ['sofmaxMainModel_W_Sense', 'sofmaxMainModel_b_Sense']
+
+        def recurTrain(_rep_dropout_sense, _cands, _key, _fWSense, _fbSense):
+            _WSense = _fWSense[_cands[1:(_cands[0] + 1)]]
+            _bSense = _fbSense[_cands[1:(_cands[0] + 1)]]
+            _p_y_given_x_dropout_sense = T.nnet.softmax(T.dot(_WSense, _rep_dropout_sense) + _bSense)[0]
+
+            return _p_y_given_x_dropout_sense[_key]
+
+        sscores, _ = theano.scan(fn=recurTrain,
+                                 sequences=[fetre_dropout, self.container['candidates'], self.container['keys']],
+                                 outputs_info=[None],
+                                 non_sequences=[softmaxWSense, softmaxbSense],
+                                 n_steps=fetre_dropout.shape[0])
+        nll_sense = -T.mean(T.log(sscores[0]))
+
+        def recurTest(_rep_sense, _cands, _fWSense, _fbSense):
+            _WSense = _fWSense[_cands[1:(_cands[0] + 1)]]
+            _bSense = _fbSense[_cands[1:(_cands[0] + 1)]]
+            _p_y_given_x_sense = T.nnet.softmax(T.dot((1.0 - self.args['dropout']) * _WSense, _rep_sense) + _bSense)[0]
+            _id_sense = T.argmax(_p_y_given_x_sense)
+
+            return _cands[1 + _id_sense]
+
+        spreds, _ = theano.scan(fn=recurTest,
+                                sequences=[fetre, self.container['candidates']],
+                                outputs_info=[None],
+                                non_sequences=[softmaxWSense, softmaxbSense],
+                                n_steps=fetre.shape[0])
+        y_pred_sense = spreds
+
+        gradients_sense = T.grad(nll_sense, params_sense)
+
+        ########################################################################################################
+
+        if self.args['regularizer'] > 0.:
+            for pp, nn in zip(self.container['params'], self.container['names']):
+                if 'multi' in nn:
+                    nll_event += self.args['regularizer'] * (pp ** 2).sum()
+                    nll_sense += self.args['regularizer'] * (pp ** 2).sum()
+
+        classifyInput = [self.container['vars'][ed] for ed in self.args['features'] if self.args['features'][ed] >= 0]
+        classifyInput += [self.container['anchor']]
+
+        if self.args['useBinaryFeatures']:
+            classifyInput += [self.container['binaryFeatures']]
+
+        classifyInput += [self.container['candidates']]
+
+        # theano functions
+        self.pred_event = theano.function(inputs=classifyInput, outputs=y_pred_event, on_unused_input='ignore')
+        self.pred_wsd = theano.function(inputs=classifyInput, outputs=y_pred_sense, on_unused_input='ignore')
+
+        trainInput = classifyInput + [self.container['keys']]
+
+        self.f_grad_shared_event, self.f_update_param_event = eval(self.args['optimizer'])(trainInput, nll_event,
+                                                                                           names_event,
+                                                                                           params_event,
+                                                                                           gradients_event,
+                                                                                           self.container['lr'],
+                                                                                           self.args['norm_lim'])
+        self.f_grad_shared_sense, self.f_update_param_sense = eval(self.args['optimizer'])(trainInput, nll_sense,
+                                                                                           names_sense,
+                                                                                           params_sense,
+                                                                                           gradients_sense,
+                                                                                           self.container['lr'],
+                                                                                           self.args['norm_lim'])
+        self.container['setZero'] = OrderedDict()
+        self.container['zeroVecs'] = OrderedDict()
+        for ed in self.container['embDict']:
+            ed_fea = ed.split('_')[0]
+            self.container['zeroVecs'][ed] = numpy.zeros(self.args['embs'][ed_fea].shape[1], dtype='float32')
+            self.container['setZero'][ed] = theano.function([self.container['zeroVector']],
+                                                            updates=[(self.container['embDict'][ed],
+                                                                      T.set_subtensor(
+                                                                          self.container['embDict'][ed][0, :],
+                                                                          self.container['zeroVector']))])
+
 def alternateHead(model):
 
     dimIn = model.container['dimIn']

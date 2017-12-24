@@ -1,37 +1,45 @@
 from wsd import train
+from wsd_alt import train as train_alt
 from collections import OrderedDict
 import sys
 import argparse
 
 def main(params):
     print params
-    train(dataset_path = params['dataset_path'],
-          embedding_path = params['embedding_path'],
-          model = params['model'],
-          wedWindow = params['wedWindow'],
-          expected_features = params['expected_features'],
-          contextLength = params['contextLength'],
-          givenPath = params['givenPath'],
-          updateEmbs = params['updateEmbs'],
-          optimizer = params['optimizer'],
-          lr = params['lr'],
-          dropout = params['dropout'],
-          regularizer = params['regularizer'],
-          norm_lim = params['norm_lim'],
-          verbose = params['verbose'],
-          decay = params['decay'],
-          batch = params['batch'],
-          multilayerNN1 = params['multilayerNN1'],
-          multilayerNN2 = params['multilayerNN2'],
-          nhidden = params['nhidden'],
-          conv_feature_map = params['conv_feature_map'],
-          conv_win_feature_map = params['conv_win_feature_map'],
-          lamb=params['lamb'],
-          seed = params['seed'],
-          #emb_dimension=300, # dimension of word embedding
-          nepochs = params['nepochs'],
-          folder = params['folder'],
-          _params = params)
+
+    train_func = 'train'
+    if 'alt_' in params['model']:
+        params['model'] = params['model'].split('_')[1]
+        train_func = 'train_alt'
+
+    eval(train_func)(dataset_path=params['dataset_path'],
+                     embedding_path=params['embedding_path'],
+                     model=params['model'],
+                     wedWindow=params['wedWindow'],
+                     expected_features=params['expected_features'],
+                     contextLength=params['contextLength'],
+                     givenPath=params['givenPath'],
+                     updateEmbs=params['updateEmbs'],
+                     optimizer=params['optimizer'],
+                     lr=params['lr'],
+                     dropout=params['dropout'],
+                     regularizer=params['regularizer'],
+                     norm_lim=params['norm_lim'],
+                     verbose=params['verbose'],
+                     decay=params['decay'],
+                     batch=params['batch'],
+                     multilayerNN1=params['multilayerNN1'],
+                     multilayerNN2=params['multilayerNN2'],
+                     nhidden=params['nhidden'],
+                     conv_feature_map=params['conv_feature_map'],
+                     conv_win_feature_map=params['conv_win_feature_map'],
+                     lamb=params['lamb'],
+                     seed=params['seed'],
+                     # emb_dimension=300, # dimension of word embedding
+                     nepochs=params['nepochs'],
+                     folder=params['folder'],
+                     _params=params)
+
 def fetStr(ef):
     res = ''
     for f in ef:
@@ -79,12 +87,12 @@ if __name__=='__main__':
     
     pars={'dataset_path' : '/scratch/wl1191/wsd2ed2/data/Semcor',
           'embedding_path' : '/scratch/wl1191/wsd2ed2/data/Semcor_processed/text.fetFreq2.SemcorACE.NoShuffled.TwoNets.pkl',
-          'model' : 'convolute2', # convolute # rnnHead, rnnMax, rnnHeadFf, rnnMaxFf, rnnHeadForward, rnnHeadBackward, rnnMaxForward, rnnMaxBackward, rnnHeadFfForward, rnnHeadFfBackward, rnnMaxFfForward, rnnMaxFfBackward # alternateHead, alternateMax, alternateConv, nonConsecutiveConvolute, rnnHeadNonConsecutiveConv
+          'model' : 'convolute2', # alt_convolute # convolute # rnnHead, rnnMax, rnnHeadFf, rnnMaxFf, rnnHeadForward, rnnHeadBackward, rnnMaxForward, rnnMaxBackward, rnnHeadFfForward, rnnHeadFfBackward, rnnMaxFfForward, rnnMaxFfBackward # alternateHead, alternateMax, alternateConv, nonConsecutiveConvolute, rnnHeadNonConsecutiveConv
           'wedWindow' : 2,
           'expected_features' : OrderedDict([('anchor', 0),
                                             ]),
           'contextLength' : 21,
-          'givenPath' : None,
+          'givenPath' : '/scratch/wl1191/wsd2ed2/data/convolute2.cw-0.cl-21.h-300.cf-300.cwf-2345.lamb-0.0.i8.pkl',
           'updateEmbs' : True,
           'optimizer' : 'adadelta',
           'lr' : 0.01,
@@ -99,7 +107,7 @@ if __name__=='__main__':
           'nhidden' : 300,
           'conv_feature_map' : 300,
           'conv_win_feature_map' : [2,3,4,5],
-          'lamb': 0.01,
+          'lamb': 0.5,
           'seed' : 3435,
           'nepochs' : 20,
           'folder' : './res'}
