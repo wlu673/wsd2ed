@@ -159,6 +159,25 @@ def getInverseConcatenation(embDict, vars, features, features_dim):
     
     return ibasex
 
+
+def getInverseConcatenationSuffix(embDict, vars, features, features_dim, suffix):
+    ixs = []
+
+    for ed in features:
+        if features[ed] == 0:
+            var = vars[ed].T[::-1]
+            ixs += [embDict[ed + '_' + suffix][T.cast(var.flatten(), dtype='int32')].reshape(
+                (var.shape[0], var.shape[1], features_dim[ed]))]
+        elif features[ed] == 1:
+            ixs += [vars[ed].dimshuffle(1, 0, 2)[::-1]]
+
+    if len(ixs) == 1:
+        ibasex = ixs[0]
+    else:
+        ibasex = T.cast(T.concatenate(ixs, axis=2), dtype=theano.config.floatX)
+
+    return ibasex
+
 def createMatrix(random, kGivens, name, word2idDict=None, id2wordDict=None):
     if 'sofmaxMainModel_' in name: return random
     if name in kGivens:
@@ -315,6 +334,13 @@ def gruBiDirect(embDict, vars, features, features_dim, dimIn, hidden, batch, pre
     ibix = getInverseConcatenation(embDict, vars, features, features_dim)
     
     return gruBidirectCore(bix, ibix, dimIn, hidden, batch, prefix + '_grubi', prefix + '_gruibi', params, names, kGivens=kGivens)
+
+def gruBiDirectSuffix(embDict, vars, features, features_dim, dimIn, hidden, batch, prefix, suffix, params, names, kGivens={}):
+    bix = getConcatenationSuffix(embDict, vars, features, features_dim, suffix, tranpose=True)
+    ibix = getInverseConcatenationSuffix(embDict, vars, features, features_dim, suffix)
+
+    return gruBidirectCore(bix, ibix, dimIn, hidden, batch, prefix + '_grubi' + '_' + suffix, prefix + '_gruibi' + '_' + suffix,
+                           params, names, kGivens=kGivens)
     
 ###############################CONVOLUTIONAL CONTEXT####################################
 
@@ -935,7 +961,7 @@ class twoNetsModel():
         self.buildFunctionsTwoNets(fetre_sense, fetre_dropout_sense, fetre_event, fetre_dropout_event, dim_inter)
 
     def getRep(self, suffix):
-        fetre, dim_inter = eval(self.args['model'] + '_suffix')(self, suffix)
+        fetre, dim_inter = eval(self.args['model'] + 'Suffix')(self, suffix)
 
         if self.args['wedWindow'] > 0:
             rep, dim_rep = localWordEmbeddingsTriggerSuffix(self, suffix)
@@ -1378,7 +1404,7 @@ def convolute(model):
     
     return fConv, dim_conv
 
-def convolute_suffix(model, suffix):
+def convoluteSuffix(model, suffix):
     _x = getConcatenationSuffix(model.container['embDict'], model.container['vars'], model.args['features'],
                           model.args['features_dim'], suffix, tranpose=False)
 
@@ -1407,6 +1433,11 @@ def rnnHeadNonConsecutiveConv(model):
 def rnnHead(model):
     _x = gruBiDirect(model.container['embDict'], model.container['vars'], model.args['features'], model.args['features_dim'], model.container['dimIn'] , model.args['nh'], model.args['batch'], 'rnnHead', model.container['params'], model.container['names'], kGivens=model.args['kGivens'])
     return rnnHeadIn(model, _x, 2)
+
+def rnnHeadSuffix(model, suffix):
+    _x = gruBiDirectSuffix(model.container['embDict'], model.container['vars'], model.args['features'], model.args['features_dim'], model.container['dimIn'] , model.args['nh'], model.args['batch'], 'rnnHead', suffix, model.container['params'], model.container['names'], kGivens=model.args['kGivens'])
+    return rnnHeadIn(model, _x, 2)
+
 ##  
 def rnnHeadForward(model):
     _x = gruForward(model.container['embDict'], model.container['vars'], model.args['features'], model.args['features_dim'], model.container['dimIn'] , model.args['nh'], model.args['batch'], 'rnnHeadForward', model.container['params'], model.container['names'], kGivens=model.args['kGivens'])
