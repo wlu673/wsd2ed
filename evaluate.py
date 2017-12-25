@@ -102,7 +102,7 @@ if __name__=='__main__':
           'verbose' : 1,
           'decay' : False,
           'batch' : 50,
-          'multilayerNN1' : [1200],
+          'multilayerNN1' : [600],
           'multilayerNN2' : [],
           'nhidden' : 300,
           'conv_feature_map' : 300,
