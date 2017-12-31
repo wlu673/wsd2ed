@@ -961,7 +961,16 @@ class twoNetsModel():
         self.buildFunctionsTwoNets(fetre_sense, fetre_dropout_sense, fetre_event, fetre_dropout_event, dim_inter)
 
     def getRep(self, suffix):
-        fetre, dim_inter = eval(self.args['model'] + 'Suffix')(self, suffix)
+        if '_' in self.args['model']:
+            fetre_m, dim_m = [], []
+            for m in self.args['model'].split('_'):
+                f, d = eval(m + 'Suffix')(self, suffix)
+                fetre_m += [f]
+                dim_m += [d]
+            fetre = T.concatenate(fetre_m, axis=1)
+            dim_inter = sum(dim_m)
+        else:
+            fetre, dim_inter = eval(self.args['model'] + 'Suffix')(self, suffix)
 
         if self.args['wedWindow'] > 0:
             rep, dim_rep = localWordEmbeddingsTriggerSuffix(self, suffix)
@@ -1115,7 +1124,16 @@ class altModel(BaseModel):
     def __init__(self, args):
         BaseModel.__init__(self, args)
 
-        fetre, dim_inter = eval(self.args['model'])(self)
+        if '_' in self.args['model']:
+            fetre_m, dim_m = [], []
+            for m in self.args['model'].split('_'):
+                f, d = eval(m)(self)
+                fetre_m += [f]
+                dim_m += [d]
+            fetre = T.concatenate(fetre_m, axis=1)
+            dim_inter = sum(dim_m)
+        else:
+            fetre, dim_inter = eval(self.args['model'])(self)
 
         if self.args['wedWindow'] > 0:
             rep, dim_rep = localWordEmbeddingsTrigger(self)
@@ -1423,6 +1441,15 @@ def nonConsecutiveConvolute(model):
         
     dim_conv = model.args['conv_feature_map'] * len(model.args['conv_win_feature_map'])
     
+    return fConv, dim_conv
+
+def nonConsecutiveConvoluteSuffix(model, suffix):
+    _x = getConcatenationSuffix(model.container['embDict'], model.container['vars'], model.args['features'], model.args['features_dim'], suffix, tranpose=False)
+
+    fConv = nonConsecutiveConvNet(_x, model.args['conv_feature_map'], model.args['conv_win_feature_map'], model.args['batch'], model.args['conv_winre'], model.container['dimIn'], 'nonConsecutiveConvolute_' + suffix, model.container['params'], model.container['names'], kGivens=model.args['kGivens'])
+
+    dim_conv = model.args['conv_feature_map'] * len(model.args['conv_win_feature_map'])
+
     return fConv, dim_conv
     
 def rnnHeadNonConsecutiveConv(model):

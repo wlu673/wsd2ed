@@ -87,7 +87,7 @@ if __name__=='__main__':
     
     pars={'dataset_path' : '/scratch/wl1191/wsd2ed2/data/Semcor',
           'embedding_path' : '/scratch/wl1191/wsd2ed2/data/Semcor_processed/text.fetFreq2.SemcorACE.NoShuffled.TwoNets.pkl',
-          'model' : 'rnnHead2', # convolute2 # alt_convolute # convolute # rnnHead, rnnMax, rnnHeadFf, rnnMaxFf, rnnHeadForward, rnnHeadBackward, rnnMaxForward, rnnMaxBackward, rnnHeadFfForward, rnnHeadFfBackward, rnnMaxFfForward, rnnMaxFfBackward # alternateHead, alternateMax, alternateConv, nonConsecutiveConvolute, rnnHeadNonConsecutiveConv
+          'model' : 'convolute_rnnHead2', # rnnHead2 # convolute2 # alt_convolute # convolute # rnnHead, rnnMax, rnnHeadFf, rnnMaxFf, rnnHeadForward, rnnHeadBackward, rnnMaxForward, rnnMaxBackward, rnnHeadFfForward, rnnHeadFfBackward, rnnMaxFfForward, rnnMaxFfBackward # alternateHead, alternateMax, alternateConv, nonConsecutiveConvolute, rnnHeadNonConsecutiveConv
           'wedWindow' : 2,
           'expected_features' : OrderedDict([('anchor', 0),
                                             ]),
@@ -102,7 +102,7 @@ if __name__=='__main__':
           'verbose' : 1,
           'decay' : False,
           'batch' : 50,
-          'multilayerNN1' : [600],
+          'multilayerNN1' : [1200],
           'multilayerNN2' : [],
           'nhidden' : 300,
           'conv_feature_map' : 300,
