@@ -27,15 +27,17 @@ def readInputFiles(iFolder):
     maxCandidateSense = -1
     maxNumFeature = -1
     wordCounter = defaultdict(int)
+    entTypeCounter = defaultdict(int)
     eventCounter = defaultdict(int)
     senseCounter = defaultdict(int)
     fetCounter = defaultdict(int)
     
     # read data
     for datName in datNames:
-        with open(iFolder + '/' + datName + '.dat') as f:
+        fname = iFolder + '/' + datName + '.entity.dat'
+        with open(fname, 'r') as f:
             for line in f:
-                line = line.strip()
+                line = line.rstrip('\r\n')
                 els = line.split('\t')
                 words = els[2].split()
                 for w in words: wordCounter[w.lower()] += 1
@@ -61,8 +63,12 @@ def readInputFiles(iFolder):
                 
                 if 'sense' not in datName and datName != 'eventTest':
                     for fet in els[6].split(): fetCounter[fet] += 1
+
+                for et in els[7].split(';'):
+                    entTypeCounter[et] += 1
     
     print 'number of words in counter: ', len(wordCounter)
+    print 'Entity types in counter: ', entTypeCounter
     print 'number of event types in counter: ', len(eventCounter)
     print 'number of senses in counter: ', len(senseCounter)
     print 'number of features in counter: ', len(fetCounter)
@@ -72,7 +78,7 @@ def readInputFiles(iFolder):
     print 'maximum number of sense candidates: ', maxCandidateSense
     print 'maximum number of features: ', maxNumFeature
     
-    return maxLens, wordCounter, eventCounter, senseCounter, fetCounter, maxCandidateEvent, maxCandidateSense, maxNumFeature
+    return maxLens, wordCounter, entTypeCounter, eventCounter, senseCounter, fetCounter, maxCandidateEvent, maxCandidateSense, maxNumFeature
 
 def get_W(word_vecs, k=300):
     """
@@ -169,7 +175,7 @@ def main():
     oFolder = '/scratch/wl1191/wsd2ed2/data/Semcor_processed'
     fetFreq = 2
 
-    maxLens, wordCounter, eventCounter, senseCounter, fetCounter, maxCandidateEvent, maxCandidateSense, maxNumFeature = readInputFiles(iFolder)
+    maxLens, wordCounter, entTypeCounter, eventCounter, senseCounter, fetCounter, maxCandidateEvent, maxCandidateSense, maxNumFeature = readInputFiles(iFolder)
     
     print "loading word embeddings...",
     dimEmb = 300
@@ -186,13 +192,16 @@ def main():
     dist_size = 1000
     dist_dim = 50
     D = np.random.uniform(-0.25,0.25,(dist_size,dist_dim))
-    
+
     embeddings = {}
     embeddings['word'] = W1
+    embeddings['entityType'] = np.random.uniform(-0.25, 0.25, (len(entTypeCounter) + 1, 50))
+    embeddings['anchor'] = D
     embeddings['anchor'] = D
     
     dictionaries = {}
     dictionaries['word'] = word_idx_map
+    dictionaries['entityType'] = makeDict(entTypeCounter)
     dictionaries['eventTypeId'] = makeDict(eventCounter, False)
     dictionaries['senseId'] = makeDict(senseCounter)
     dictionaries['featureId'] = makeDict(fetCounter, False, fetFreq)
@@ -204,8 +213,8 @@ def main():
     dictionaries['maxNumFeature'] = maxNumFeature
     
     print 'dumping ...'
-    cPickle.dump([embeddings, dictionaries], open(oFolder + '/' + embType + '.fetFreq2.SemcorACE.NoShuffled.TwoNets.pkl', 'wb'))
+    cPickle.dump([embeddings, dictionaries], open(oFolder + '/' + embType + '.fetFreq2.SemcorACE.NoShuffled.TwoNets.Entity.pkl', 'wb'))
     print "dataset created!"
 
-if __name__=='__main__':
+if __name__ == '__main__':
     main()

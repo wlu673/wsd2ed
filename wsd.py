@@ -220,7 +220,7 @@ def train(dataset_path='',
     datasets = {}
     for dn in datasetNames:
         datasets[dn] = TextIterator(dn,
-                                    dataset_path + '/' + dn + '.dat',
+                                    dataset_path + '/' + dn + '.entity.dat',
                                     dictionaries,
                                     batch_size=batch,
                                     maxLenContext=contextLength,

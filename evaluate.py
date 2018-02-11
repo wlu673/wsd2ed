@@ -86,11 +86,11 @@ def argsp():
 if __name__=='__main__':
     
     pars={'dataset_path' : '/scratch/wl1191/wsd2ed2/data/Semcor',
-          'embedding_path' : '/scratch/wl1191/wsd2ed2/data/Semcor_processed/text.fetFreq2.SemcorACE.NoShuffled.TwoNets.pkl',
-          'model' : 'convolute_rnnHead2', # rnnHead2 # convolute2 # alt_convolute # convolute # rnnHead, rnnMax, rnnHeadFf, rnnMaxFf, rnnHeadForward, rnnHeadBackward, rnnMaxForward, rnnMaxBackward, rnnHeadFfForward, rnnHeadFfBackward, rnnMaxFfForward, rnnMaxFfBackward # alternateHead, alternateMax, alternateConv, nonConsecutiveConvolute, rnnHeadNonConsecutiveConv
+          'embedding_path' : '/scratch/wl1191/wsd2ed2/data/Semcor_processed/text.fetFreq2.SemcorACE.NoShuffled.TwoNets.Entity.pkl',
+          'model' : 'alt_convolute', # rnnHead2 # convolute2 # alt_convolute # convolute # rnnHead, rnnMax, rnnHeadFf, rnnMaxFf, rnnHeadForward, rnnHeadBackward, rnnMaxForward, rnnMaxBackward, rnnHeadFfForward, rnnHeadFfBackward, rnnMaxFfForward, rnnMaxFfBackward # alternateHead, alternateMax, alternateConv, nonConsecutiveConvolute, rnnHeadNonConsecutiveConv
           'wedWindow' : 2,
           'expected_features' : OrderedDict([('anchor', 0),
-                                            ]),
+                                             ('entityType', 0)]),
           'contextLength' : 21,
           'givenPath' : None,
           'updateEmbs' : True,
@@ -143,6 +143,6 @@ if __name__=='__main__':
              + '.norm_' + str(pars['norm_lim']) \
              + '.s_' + str(pars['seed'])
     if pars['givenPath']: folder += '.gp'
-    pars['folder'] =  'allReLu.sp.w21.newCand2.SemcorACE.NoShuffled.' + folder
+    pars['folder'] =  'allReLu.sp.w21.newCand2.SemcorACE.NoShuffled.Entity.' + folder
     
     main(pars)

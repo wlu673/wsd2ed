@@ -22,6 +22,7 @@ class TextIterator:
         self.name = datasetName
         self.dataset = fopen(datasetFile, 'r')
         self.wordDict = dictionaries['word']
+        self.entityTypeDict = dictionaries['entityType']
         self.eventTypeDict = dictionaries['eventTypeId']
         self.senseDict = dictionaries['senseId']
         self.featureDict = dictionaries['featureId']
@@ -38,6 +39,7 @@ class TextIterator:
         self.buffer_wordTypes = []
 
         self.buffer_words = []
+        self.buffer_entityTypes = []
 
         self.buffer_anchors = []
 
@@ -50,6 +52,7 @@ class TextIterator:
         self.oneBat_buffer_wordTypes = []
 
         self.oneBat_buffer_words = []
+        self.oneBat_buffer_entityTypes = []
 
         self.oneBat_buffer_anchors = []
 
@@ -63,6 +66,7 @@ class TextIterator:
         self.insIds = [''] * batch_size
         self.wrdTypes = [''] * batch_size
         self.words = np.zeros((batch_size, self.maxLenContext), dtype='int32')
+        self.entityTypes = np.zeros((batch_size, self.maxLenContext), dtype='int32')
         self.insAnchors = np.zeros((batch_size,), dtype='int32')
         self.keys = np.zeros((batch_size,), dtype='int32')
         self.candidates = np.zeros((batch_size, self.maxCandidateSense + 1), dtype='int32')
@@ -78,6 +82,7 @@ class TextIterator:
         self.oneBat_buffer_wordTypes = []
 
         self.oneBat_buffer_words = []
+        self.oneBat_buffer_entityTypes = []
 
         self.oneBat_buffer_anchors = []
 
@@ -107,12 +112,14 @@ class TextIterator:
                 skey = els[4]
                 scands = els[5]
                 features = els[6]
+                entityTypes = els[7]
 
                 if skey not in scands.split(';') and not self.toPredict: continue
 
                 self.buffer_instanceIds.append(insId)
                 self.buffer_wordTypes.append(wordType)
                 self.buffer_words.append(words)
+                self.buffer_entityTypes.append(entityTypes)
                 self.buffer_anchors.append(anchor)
                 self.buffer_keys.append(skey)
                 self.buffer_candidates.append(scands)
@@ -126,6 +133,8 @@ class TextIterator:
                 shuffle(self.buffer_wordTypes)
                 random.seed(seedRand)
                 shuffle(self.buffer_words)
+                random.seed(seedRand)
+                shuffle(self.buffer_entityTypes)
                 random.seed(seedRand)
                 shuffle(self.buffer_anchors)
                 random.seed(seedRand)
@@ -142,6 +151,7 @@ class TextIterator:
                     self.oneBat_buffer_instanceIds.append(self.buffer_instanceIds[ti])
                     self.oneBat_buffer_wordTypes.append(self.buffer_wordTypes[ti])
                     self.oneBat_buffer_words.append(self.buffer_words[ti])
+                    self.oneBat_buffer_entityTypes.append(self.buffer_entityTypes[ti])
                     self.oneBat_buffer_anchors.append(self.buffer_anchors[ti])
                     self.oneBat_buffer_keys.append(self.buffer_keys[ti])
                     self.oneBat_buffer_candidates.append(self.buffer_candidates[ti])
@@ -157,6 +167,7 @@ class TextIterator:
                     self.buffer_instanceIds.insert(0, self.oneBat_buffer_instanceIds[ti])
                     self.buffer_wordTypes.insert(0, self.oneBat_buffer_wordTypes[ti])
                     self.buffer_words.insert(0, self.oneBat_buffer_words[ti])
+                    self.buffer_entityTypes.insert(0, self.oneBat_buffer_entityTypes[ti])
                     self.buffer_anchors.insert(0, self.oneBat_buffer_anchors[ti])
                     self.buffer_keys.insert(0, self.oneBat_buffer_keys[ti])
                     self.buffer_candidates.insert(0, self.oneBat_buffer_candidates[ti])
@@ -167,12 +178,14 @@ class TextIterator:
                         'insIds' : None,
                         'wrdTypes' : None,
                         'word' : None,
+                        'entityType': None,
                         'insAnchors' : None,
                         'keys' : None,
                         'candidates' : None,
                         'binaryFeatures' : None}, -1
 
         self.words[::] = 0
+        self.entityTypes[::] = 0
         self.keys[:] = 0
         self.candidates[::] = 0
         self.binaryFeatures[::] = -1
@@ -184,9 +197,11 @@ class TextIterator:
 
             aa = self.buffer_anchors.pop()
             ws = self.buffer_words.pop().split()
+            ets = self.buffer_entityTypes.pop().split(';')
             for wid in range(self.maxLenContext):
                 if (wid+aa-self.maxLenContext/2) >= 0 and (wid+aa-self.maxLenContext/2) < len(ws):
                     self.words[i][wid] = self.wordDict[ws[wid+aa-self.maxLenContext/2]] if ws[wid+aa-self.maxLenContext/2] in self.wordDict else 1
+                    self.entityTypes[i][wid] = self.entityTypeDict[ets[wid+aa-self.maxLenContext/2]]
             self.insAnchors[i] = self.maxLenContext/2
 
             if 'sense' in self.name:
@@ -243,6 +258,7 @@ class TextIterator:
                 'insIds' : self.insIds,
                 'wrdTypes' : self.wrdTypes,
                 'word' : self.words,
+                'entityType': self.entityTypes,
                 'insAnchors' : self.insAnchors,
                 'keys' : self.keys,
                 'candidates' : self.candidates,

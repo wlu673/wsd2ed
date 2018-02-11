@@ -30,7 +30,7 @@ def load_anns(root):
             entries = line.split('\t')
 
             if len(entries[-2]) == 0:
-                anns_dict[entries[0]] = ''
+                anns_dict[entries[0]] = ';'.join(['OTH'] * len(entries[-3].split(' ')))
                 continue
 
             entities = entries[-2].split(' ')
@@ -47,7 +47,7 @@ def load_anns(root):
                 if i in entities_dict:
                     anns += entities_dict[i] + ';'
                 else:
-                    anns += 'OTHER' + ';'
+                    anns += 'OTH' + ';'
 
             anns_dict[entries[0]] = anns[:-1]
 
