@@ -226,8 +226,8 @@ def train(dataset_path='',
         elif features[ffin] == 0:
             features_dim[ffin] = embeddings[ffin].shape[1]
 
-    datasetNames = ['senseTrain', 'eventTrain', 'senseValid', 'sense02', 'sense03', 'sense07', 'eventValid',
-                    'eventTest']
+    datasetNames = ['senseTrainNoun', 'eventTrain',     # 'senseValid', 'sense02', 'sense03', 'sense07'
+                    'eventValid','eventTest']
     datasets = {}
     for dn in datasetNames:
         datasets[dn] = TextIterator(dn,
@@ -278,13 +278,13 @@ def train(dataset_path='',
     wsdModel = eval('altModel')(params)
     print 'done'
 
-    trainDataSense = datasets['senseTrain']
+    trainDataSense = datasets['senseTrainNoun']
     trainDataEvent = datasets['eventTrain']
     evaluatingDataset = OrderedDict([
-        ('senseValid', datasets['senseValid']),
-        ('sense02', datasets['sense02']),
-        ('sense03', datasets['sense03']),
-        ('sense07', datasets['sense07']),
+        # ('senseValid', datasets['senseValid']),
+        # ('sense02', datasets['sense02']),
+        # ('sense03', datasets['sense03']),
+        # ('sense07', datasets['sense07']),
         ('eventValid', datasets['eventValid']),
         ('eventTest', datasets['eventTest']),
     ])
@@ -368,14 +368,15 @@ def train(dataset_path='',
 
         perPrint(_perfs)
 
-        print 'saving parameters ...'
-        wsdModel.save(paramFileName + '.i' + str(e) + '.pkl')
-
         # print 'saving output ...'
         # for elu in evaluatingDataset:
         #    saving(evaluatingDataset[elu], _predictions[elu], _probs[elu], idx2word, idx2label, idMappings[elu], folder + '/' + elu + str(e) + '.out')
 
         if _perfs['eventValid']['f1'] > best_f1:
+            if e > 0:
+                print 'saving parameters ...'
+                wsdModel.save(paramFileName + '.i' + str(e) + '.pkl')
+
             # rnn.save(folder)
             best_f1 = _perfs['eventValid']['f1']
             print '*************NEW BEST: epoch: ', e
