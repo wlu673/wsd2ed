@@ -21,7 +21,8 @@ def lookup(mess, key, gdict, addOne):
 
 def readInputFiles(iFolder):
     
-    datNames = ['eventTrain', 'senseTrain', 'senseValid', 'sense02', 'sense03', 'sense07', 'eventTest', 'eventValid']
+    # datNames = ['eventTrain', 'senseTrain', 'senseValid', 'sense02', 'sense03', 'sense07', 'eventTest', 'eventValid']
+    datNames = ['eventTrainTAC', 'senseTrain', 'senseValid', 'sense02', 'sense03', 'sense07', 'eventTestTAC']
     maxLens = defaultdict(int)
     maxCandidateEvent = -1
     maxCandidateSense = -1
@@ -169,8 +170,8 @@ def makeDict(counter, addOne=True, freq=1):
 
 def main():
     embType = 'text'
-    w2v_file_bin = '/scratch/wl1191/wsd2ed/data/GoogleNews-vectors-negative300.bin'
-    w2v_file_text = '/scratch/wl1191/wsd2ed/data/concatEmbeddings.txt'
+    w2v_file_bin = '/scratch/wl1191/wsd2ed2/data/GoogleNews-vectors-negative300.bin'
+    w2v_file_text = '/scratch/wl1191/wsd2ed2/data/concatEmbeddings.txt'
     iFolder = '/scratch/wl1191/wsd2ed2/data/Semcor'
     oFolder = '/scratch/wl1191/wsd2ed2/data/Semcor_processed'
     fetFreq = 2
@@ -213,7 +214,7 @@ def main():
     dictionaries['maxNumFeature'] = maxNumFeature
     
     print 'dumping ...'
-    cPickle.dump([embeddings, dictionaries], open(oFolder + '/' + embType + '.fetFreq2.SemcorACE.NoShuffled.TwoNets.Entity.pkl', 'wb'))
+    cPickle.dump([embeddings, dictionaries], open(oFolder + '/' + embType + '.fetFreq2.SemcorACE.NoShuffled.TwoNets.Entity.TAC.pkl', 'wb'))
     print "dataset created!"
 
 if __name__ == '__main__':

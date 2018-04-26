@@ -28,7 +28,8 @@ paths_to_keys = {
     'sense03': '/scratch/wl1191/wsd2ed2/data/Semcor/sense03.key',
     'sense07': '/scratch/wl1191/wsd2ed2/data/Semcor/sense07.key',
     'eventValid': '/scratch/wl1191/wsd2ed2/data/Semcor/eventValid.key',
-    'eventTest': '/scratch/wl1191/wsd2ed2/data/Semcor/eventTest.key', }
+    'eventTest': '/scratch/wl1191/wsd2ed2/data/Semcor/eventTest.key',
+    'eventTestTAC': '/scratch/wl1191/wsd2ed2/data/Semcor/eventTestTAC.key'}
 
 
 def prepareData(rev, embeddings, dictionaries, features, anchorMat, useBinaryFeatures):
@@ -183,7 +184,7 @@ def train(dataset_path='',
     else:
         print givenPath, ' not exist'
 
-    folder = '/scratch/wl1191/wsd2ed2/out/' + folder
+    folder = '/scratch/wl1191/wsd2ed2/out/sense02/' + folder
 
     paramFolder = folder + '/params'
 
@@ -226,8 +227,9 @@ def train(dataset_path='',
         elif features[ffin] == 0:
             features_dim[ffin] = embeddings[ffin].shape[1]
 
-    datasetNames = ['senseTrainNoun', 'eventTrain',     # 'senseValid', 'sense02', 'sense03', 'sense07'
-                    'eventValid','eventTest']
+    datasetNames = ['sense02', 'eventTrain',     # 'senseTrain', 'senseValid', 'sense03', 'sense07'
+                    'eventValid', 'eventTest'    # 'eventTestTAC'
+                    ]
     datasets = {}
     for dn in datasetNames:
         datasets[dn] = TextIterator(dn,
@@ -235,7 +237,7 @@ def train(dataset_path='',
                                     dictionaries,
                                     batch_size=batch,
                                     maxLenContext=contextLength,
-                                    toPredict=False if 'Train' in dn else True)
+                                    toPredict=False if 'Train' in dn or 'sense' in dn else True)
 
     del _params['dataset_path']
     del _params['embedding_path']
@@ -278,7 +280,7 @@ def train(dataset_path='',
     wsdModel = eval('altModel')(params)
     print 'done'
 
-    trainDataSense = datasets['senseTrainNoun']
+    trainDataSense = datasets['sense02']    # 'senseTrain'
     trainDataEvent = datasets['eventTrain']
     evaluatingDataset = OrderedDict([
         # ('senseValid', datasets['senseValid']),
@@ -286,7 +288,8 @@ def train(dataset_path='',
         # ('sense03', datasets['sense03']),
         # ('sense07', datasets['sense07']),
         ('eventValid', datasets['eventValid']),
-        ('eventTest', datasets['eventTest']),
+        ('eventTest', datasets['eventTest'])
+        # ('eventTest', datasets['eventTestTAC'])
     ])
 
     _perfs = OrderedDict()
@@ -372,13 +375,13 @@ def train(dataset_path='',
         # for elu in evaluatingDataset:
         #    saving(evaluatingDataset[elu], _predictions[elu], _probs[elu], idx2word, idx2label, idMappings[elu], folder + '/' + elu + str(e) + '.out')
 
-        if _perfs['eventValid']['f1'] > best_f1:
+        if _perfs['eventValid']['f1'] > best_f1:    # 'eventTestTAC'
             if e > 0:
                 print 'saving parameters ...'
                 wsdModel.save(paramFileName + '.i' + str(e) + '.pkl')
 
             # rnn.save(folder)
-            best_f1 = _perfs['eventValid']['f1']
+            best_f1 = _perfs['eventValid']['f1']    # 'eventTestTAC'
             print '*************NEW BEST: epoch: ', e
             if verbose:
                 perPrint(_perfs, len('Current Performance') * '-')

@@ -24,6 +24,12 @@ class TextIterator:
         self.wordDict = dictionaries['word']
         self.entityTypeDict = dictionaries['entityType']
         self.eventTypeDict = dictionaries['eventTypeId']
+        # self.eventTypeTACDict = {
+        #     t: idx for idx, t in enumerate(
+        #         ['NONE', 'manufacture', 'transaction', 'business', 'justice',
+        #          'personnel', 'life', 'contact', 'conflict', 'movement']
+        #     )
+        # }
         self.senseDict = dictionaries['senseId']
         self.featureDict = dictionaries['featureId']
         self.maxCandidateEvent = dictionaries['maxCandidateEvent']
@@ -217,6 +223,9 @@ class TextIterator:
             ikeys = self.buffer_keys.pop().split(';')
             ikey = None
             if 'event' in self.name:
+                # if 'TAC' in self.name:
+                #     ikey = self.eventTypeTACDict[ikeys[0]]
+                # else:
                 for ik in ikeys:
                     if ik in self.eventTypeDict:
                         ikey = self.eventTypeDict[ik]
